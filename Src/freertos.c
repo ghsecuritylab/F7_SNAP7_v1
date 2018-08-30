@@ -64,7 +64,7 @@ osMessageQId modbusRtuQueueHandle;
 osMessageQId modbusAsciiQueueHandle;
 
 /* USER CODE BEGIN Variables */
-uint8_t button = 0;
+uint16_t button = 0;
 uint8_t button_action = 0;
 uint16_t adc_buffer[13];
 /* USER CODE END Variables */
@@ -123,8 +123,8 @@ void MX_FREERTOS_Init(void) {
   SysTaskHandle = osThreadCreate(osThread(SysTask), NULL);
 
   /* definition and creation of ModbusTask */
-  osThreadDef(ModbusTask, StartModbusTask, osPriorityIdle, 0, 128);
-  ModbusTaskHandle = osThreadCreate(osThread(ModbusTask), NULL);
+//  osThreadDef(ModbusTask, StartModbusTask, osPriorityIdle, 0, 128);
+//  ModbusTaskHandle = osThreadCreate(osThread(ModbusTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -152,7 +152,7 @@ void MX_FREERTOS_Init(void) {
 void StartSysTask(void const * argument)
 {
   /* init code for LWIP */
-  MX_LWIP_Init();
+//  MX_LWIP_Init();
 
   /* USER CODE BEGIN StartSysTask */
 	modbus_register_init(1,100,50);																																				// register init
@@ -173,6 +173,20 @@ void StartSysTask(void const * argument)
 		{
 			modbus_register_30000[count] = adc_buffer[count];
 		}
+		
+		if(button_action != 0)
+		{
+			modbus_tcp_writemultiple_register(1,0,13,adc_buffer);
+			button_action = 0;
+			osDelay(300);
+			modbus_tcp_check_input();
+		}
+		
+		modbus_tcp_readholding_register(1,0,13);
+		osDelay(300);
+		modbus_tcp_check_input();
+		osDelay(1);
+		
 		HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0);
     osDelay(1000);
   }
@@ -188,7 +202,7 @@ void StartModbusTask(void const * argument)
   {
 //		modbus_acsii_check_input();
 //		modbus_rtu_check_input();
-		modbus_tcp_check_input();
+//		modbus_tcp_check_input();
     osDelay(100);
   }
   /* USER CODE END StartModbusTask */
