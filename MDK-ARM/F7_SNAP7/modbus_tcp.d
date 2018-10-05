@@ -11,11 +11,6 @@ f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
-f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS/cmsis_os.h
-f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
-f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
-f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h
-f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h
 f7_snap7\modbus_tcp.o: ../Inc/lwip.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
 f7_snap7\modbus_tcp.o: ../Inc/lwipopts.h
@@ -85,6 +80,10 @@ f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/LwIP/src/include/lwip/timeouts
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/LwIP/src/include/lwip/sys.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/LwIP/system/arch/sys_arch.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS/cmsis_os.h
+f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/timers.h
+f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/queue.h
+f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/semphr.h
+f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/event_groups.h
 f7_snap7\modbus_tcp.o: ../Inc/ethernetif.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS/cmsis_os.h
 f7_snap7\modbus_tcp.o: ../Middlewares/Third_Party/LwIP/src/include/lwip/tcpip.h
@@ -95,3 +94,4 @@ f7_snap7\modbus_tcp.o: ..\Modbus\Modbus_Tcp\modbus_tcp.h
 f7_snap7\modbus_tcp.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
 f7_snap7\modbus_tcp.o: ..\Modbus\Modbus_Tcp\modbus_tcp_func.h
 f7_snap7\modbus_tcp.o: ..\Modbus\modbus_constant.h
+f7_snap7\modbus_tcp.o: ..\Modbus\circular_buffer.h

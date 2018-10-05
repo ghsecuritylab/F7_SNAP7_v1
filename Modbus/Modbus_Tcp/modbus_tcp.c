@@ -1,18 +1,19 @@
 /** @file
-  * 
+  *
   * @brief modbus tcp
   *
   */
-	
+
 /*********************************************************************************
  * INCLUDE
  */
 /* system include */
 #include "FreeRTOS.h"
 #include "task.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 
 #include "lwip.h"
+#include "ethernetif.h"
 #include "api.h"
 #include <string.h>
 
@@ -21,6 +22,8 @@
 #include "modbus_tcp_func.h"
 #include "modbus_constant.h"
 
+
+#include "circular_buffer.h"
 /*********************************************************************************
  * EXTERN
  */
@@ -36,17 +39,21 @@ extern uint8_t modbus_register_10000[MAX_REGISTES];
 extern uint16_t modbus_register_40000[MAX_REGISTES];
 extern uint16_t modbus_register_30000[MAX_REGISTES];
 
-extern osMessageQId modbusTcpRxQueueHandle;
+//extern osMessageQId modbusTcpRxQueueHandle;
 extern struct netif gnetif;
 extern void StartNetTask(void const * argument);
+
+
+uint8_t buffer_data[100];
+circular_buf_t cbuf_tcp;
 /*********************************************************************************
  * MACRO
  */
-
+#define IP_SERVER    "192.168.1.101"
 /*********************************************************************************
  * STATIC VARIABLE
  */
-static uint8_t count_error = 0;
+//static uint8_t count_error = 0;
 static uint8_t config_tcp_mode;
 struct netconn * nc;
 struct netconn * in_nc;
@@ -58,6 +65,10 @@ volatile err_t res;
 osThreadId netTaskHandle;
 osThreadId TcpTaskHandle;
 struct netconn *nc_com;
+ip_addr_t local_ip;
+ip_addr_t remote_ip;
+
+char * add_buffer;
 
 /* byte get transaction id */
 uint16_t byte_get_transaction_id;
@@ -78,7 +89,6 @@ uint8_t number_byte_follow_tcp;
 uint16_t buf_register_tcp[MAX_REGISTES];
 
 /* flag receive request or response */
-uint8_t count_flag_receive_success_tcp = 0;
 uint8_t flag_request_or_response_func1_tcp = RECEIVE_REQUEST;
 uint8_t flag_request_or_response_func2_tcp = RECEIVE_REQUEST;
 uint8_t flag_request_or_response_func3_tcp = RECEIVE_REQUEST;
@@ -89,7 +99,7 @@ uint8_t flag_request_or_response_func16_tcp = RECEIVE_REQUEST;
 /*********************************************************************************
  * STATIC FUNCTION
  */
-
+static void Server_setconnect(void);
 static void StartTcpTask(void const * argument);
 static void StartnetTask(void const * argument);
 static void function1_handle_tcp(void);
@@ -98,23 +108,83 @@ static void function3_handle_tcp(void);
 static void function4_handle_tcp(void);
 static void function15_handle_tcp(void);
 static void function16_handle_tcp(void);
+static void init_MX(void);
 /*********************************************************************************
  * GLOBAL FUNCTION
  */
 
+void ethernetif_notify_conn_changed(struct netif *netif)
+{
+	if(netif_is_link_up(netif)) // bat dau thiet lap ket noi
+	{
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_RESET);
+		printf("change connect TCP is up\r\n");
+		
+//		Server_setconnect();
+		
+//		res = netconn_accept(nc,&in_nc);
+//		printf("netconn_accept\r\n");
+//		if(res != 0)
+//		{
+//			printf("netconn_accept error \r\n");
+//		}
+//		else
+//		{
+//			printf("netconn_accept success \r\n");
+//			osThreadDef(netTask, StartnetTask, osPriorityIdle, 0, 256);
+//			netTaskHandle = osThreadCreate(osThread(netTask), (void*) in_nc);
+//			printf("incoming connection\r\n");
+//		}
+		osThreadDef(TcpTask, StartTcpTask, osPriorityNormal, 0, 256);
+		TcpTaskHandle = osThreadCreate(osThread(TcpTask), NULL);
+		printf("khoi tao lai ket noi thanh cong\r\n");
+	}
+	else  // ngung ket noi
+	{
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_RESET);
+		printf("STOP get data ethernet\r\n");
+//		res = netconn_close(nc);
+//		if(res != 0)
+//		{
+//			printf("netconn_close failure\r\n");
+//		}
+//		else
+//		{
+//			printf("netconn_close ok\r\n");
+//		}
+//		
+//		res = netconn_delete(nc);
+//		if(res != 0)
+//		{
+//			printf("netconn_delete failure\r\n");
+//		}
+//		else
+//		{
+//			printf("netconn_delete ok\r\n");
+//		}
+//		
+		osThreadTerminate(netTaskHandle);
+		osThreadTerminate(TcpTaskHandle);
+		printf("change connect TCP is down\r\n");
+	}
+}
+
 /**
- * @brief        
- * 
+ * @brief
+ *
  * @param
  */
 void modbus_tcp_port_init(uint8_t tcp_modde)
 {
+	circular_buf_init(&cbuf_tcp,buffer_data,100);
 	if(tcp_modde == TCP_CLIENT)
 	{
 		printf("SET TCP_MODE_CLIENT\r\n");
 		config_tcp_mode =  TCP_CLIENT;
 	}
-	
+
 	if(tcp_modde == TCP_SERVER)
 	{
 		printf("SET TCP_MODE_SERVER\r\n");
@@ -122,69 +192,243 @@ void modbus_tcp_port_init(uint8_t tcp_modde)
 	}
 
 	/* Start Tcp task init */
+	add_buffer = pvPortMalloc(256);
 	if(tcp_modde == TCP_SERVER || tcp_modde == TCP_CLIENT)
 	{
-		osThreadDef(TcpTask, StartTcpTask, osPriorityNormal, 0, 256);
-		TcpTaskHandle = osThreadCreate(osThread(TcpTask), NULL);
+		/* init code for LWIP */
+		init_MX();
+		/* neu dang co ket noi vat ly*/
+		if(netif_is_link_up(&gnetif))
+		{
+			if(config_tcp_mode == TCP_SERVER)
+			{
+				Server_setconnect();
+				osThreadDef(TcpTask, StartTcpTask, osPriorityNormal, 0, 256);
+				TcpTaskHandle = osThreadCreate(osThread(TcpTask), NULL);
+			}
+		}
+	}
+}
+			
+/**
+ * @brief
+ *
+ * @param
+ */
+static void init_MX(void)
+{
+	MX_LWIP_Init();
+	printf("LWIP init complete\r\n");
+	/* wait gnetif ip_addr */
+	while(gnetif.ip_addr.addr == 0)
+  {
+		osDelay(10);
+		printf("LWIP init failed\r\n");
+	}
+	printf("DHCP worked ip: %s\r\n",ip4addr_ntoa(&gnetif.ip_addr));
+}
+
+static void StartTcpTask(void const * argument)
+{
+	/* Loop netconn_accept */
+	for(;;)
+  {
+		if( config_tcp_mode ==  TCP_SERVER){
+		res = netconn_accept(nc,&in_nc);
+		printf("netconn_accept\r\n");
+		if(res != 0)
+		{
+			
+			printf("netconn_accept in StartTcpTask error with err_code is %d\r\n",res);                           //////*****************************************///////
+			osThreadTerminate(netTaskHandle);			
+			netconn_close(nc);
+			netconn_delete(nc);
+			
+//			nc = netconn_new(NETCONN_TCP);
+//			
+//			res = netconn_bind(nc, IP_ADDR_ANY, 502);
+//			if(res != 0)
+//			{
+//				printf("bind net_conn error with err_code is %d\r\n",res);
+//		//		while(1) osDelay(10);
+//			}
+//			else
+//			{
+//				printf("bind net_conn complete\r\n");
+//			}
+//			/* Set a TCP netconn into listen mode */
+//			res = netconn_listen(nc);
+//			if(res != 0)
+//			{
+//				printf("listen error with err_code is %d\r\n",res);
+//		//		while(1) osDelay(10);
+//			}
+//			else
+//			{
+//				printf("listen net_conn complete\r\n");
+//			}
+		}
+		else
+		{
+			osThreadDef(netTask, StartnetTask, osPriorityIdle, 0, 256);
+			netTaskHandle = osThreadCreate(osThread(netTask), (void*) in_nc);
+			printf("incoming connection\r\n");
+		}
+	 }
+  }
+}
+
+static void StartnetTask(void const * argument)
+{
+	/* USER CODE BEGIN StartNetTask */
+	printf("StartNetTask ******************* START\r\n");
+	nc_com = (struct netconn*) argument;
+	struct netbuf *nb;
+	volatile err_t res_;
+
+	uint16_t len;
+	uint16_t copy_check = 0;
+	printf("khai bao vung nho du lieu\r\n");
+//	char * buffer_netbuf = pvPortMalloc(256);
+	char * buffer_netbuf = add_buffer;
+	printf("buffer_netbuf %d\r\n",buffer_netbuf);
+	//
+//	while(buffer_netbuf == 0)
+//	{
+//		printf("khoi tao lai vung nho du lieu\r\n");
+//		char * buffer_netbuf = pvPortMalloc(256);
+//		osDelay(500);
+//	}
+	/* Infinite loop */
+  for(;;)
+  {
+
+		if( config_tcp_mode ==  TCP_SERVER)
+		{
+			/* get data eth */
+			res_ = netconn_recv(nc_com, &nb);
+			if(res_ != 0)
+			{
+				printf("recv error: %d\r\n",res_);
+//				while(1) osDelay(500);
+				osDelay(500);
+			}
+			else
+			{
+				len = netbuf_len(nb);
+				printf("length of data is %d\r\n",len);
+				copy_check = netbuf_copy(nb, buffer_netbuf, len);
+				if(copy_check != len)
+				{
+					printf("ERROR NETBUF_COPY \r\n");
+				}
+				netbuf_delete(nb);
+
+				/* put data to queue */
+				if(len != 0)
+				{
+					for(uint8_t count = 0; count < len; count++)
+					{
+//						xx = nb->p->payload[count];
+						circular_buf_put(&cbuf_tcp,buffer_netbuf[count]);
+					}
+
+					len = 0;
+				}
+			}
+		}
+		osDelay(10);
+  }
+}
+
+static void Server_setconnect(void)
+{
+	printf("TCP_MODE_SERVER\r\n");
+	/* Set a new connect tcp*/
+	nc = netconn_new(NETCONN_TCP);
+	if(nc == NULL)
+	{
+		printf("new error: %d\r\n",res);
+		while(1) osDelay(10);
+	}
+	/* Bind a netconn to a specific local IP address and port 502*/
+	res = netconn_bind(nc, IP4_ADDR_ANY, 502);
+	if(res != 0)
+	{
+		printf("bind net_conn error with err_code is %d\r\n",res);
+//		while(1) osDelay(10);
+	}
+	else
+	{
+		printf("bind net_conn complete\r\n");
+	}
+	/* Set a TCP netconn into listen mode */
+	res = netconn_listen(nc);
+	if(res != 0)
+	{
+		printf("listen error with err_code is %d\r\n",res);
+//		while(1) osDelay(10);
+	}
+	else
+	{
+		printf("listen net_conn complete\r\n");
 	}
 }
 
 /**
- * @brief        
- * 
+ * @brief
+ *
  * @param
  */
 void modbus_tcp_check_input(void)
 {
-	if(count_flag_receive_success_tcp != 0)
+	if(circular_buf_count_data(&cbuf_tcp) > 6)
 	{
 		/* byte get transaction id */
 		byte_get_transaction_id = mb_tcp_read_transaction_id();
+//		printf("byte_get_transaction_id is %d\r\n",byte_get_transaction_id);
 		/* byte get protocol id */
 		byte_get_protocol_id = mb_tcp_read_protocol_id();
-		/* byte get message length */
-		byte_get_message_len = mb_tcp_read_message_length();
-		/* byte get address slave */
-		byte_get_add_slave_tcp = mb_tcp_read_addslave();
-		/* check add slave */
-		if (byte_get_add_slave_tcp == add_slave)
+		if(byte_get_protocol_id == 0x0000)
 		{
-			/* byte get function */
-			byte_get_function_tcp = mb_tcp_read_function();
-			
-			switch(byte_get_function_tcp)
+			/* byte get message length */
+			byte_get_message_len = mb_tcp_read_message_length();
+			/* byte get address slave */
+			byte_get_add_slave_tcp = mb_tcp_read_addslave();
+			/* check add slave */
+			if (byte_get_add_slave_tcp == add_slave)
 			{
-				case FUNCTION_01:
-					function1_handle_tcp();
-					count_flag_receive_success_tcp-=1;
-					break;
-				case FUNCTION_02:
-					function2_handle_tcp();
-					count_flag_receive_success_tcp-=1;
-					break;
-				case FUNCTION_03:
-					function3_handle_tcp();
-				  count_flag_receive_success_tcp-=1;
-					break;
-				case FUNCTION_04:
-					function4_handle_tcp();
-					count_flag_receive_success_tcp-=1;
-					break;
-				case FUNCTION_15:
-					function15_handle_tcp();
-					count_flag_receive_success_tcp-=1;
-					break;
-				case FUNCTION_16:
-					function16_handle_tcp();
-				  count_flag_receive_success_tcp-=1;
-					break;
+				/* byte get function */
+				byte_get_function_tcp = mb_tcp_read_function();
+
+				switch(byte_get_function_tcp)
+				{
+					case FUNCTION_01:
+						function1_handle_tcp();
+						break;
+					case FUNCTION_02:
+						function2_handle_tcp();
+						break;
+					case FUNCTION_03:
+						function3_handle_tcp();
+						break;
+					case FUNCTION_04:
+						function4_handle_tcp();
+						break;
+					case FUNCTION_15:
+						function15_handle_tcp();
+						break;
+					case FUNCTION_16:
+						function16_handle_tcp();
+						break;
+				}
 			}
-		}
-		else
-		{
-			/* error add slave */
-			printf("modbus tcp error add slave \r\n");
-			/* clear data on queue */
+			else
+			{
+				/* error add slave */
+				printf("modbus tcp error add slave \r\n");
+				/* clear data on queue */
+			}
 		}
 	}
 }
@@ -316,7 +560,7 @@ static void function15_handle_tcp(void)
 		}
 		else
 		{
-			
+
 			/*send Response */
 			modbus_tcp_function15_response(byte_get_transaction_id, add_slave, add_register_start_tcp, number_register_tcp);
 			/* update register */
@@ -374,7 +618,7 @@ static void function16_handle_tcp(void)
 		}
 		else
 		{
-			
+
 			/*send Response */
 			modbus_tcp_function16_response(byte_get_transaction_id, add_slave, add_register_start_tcp, number_register_tcp);
 			/* update register */
@@ -400,198 +644,6 @@ static void function16_handle_tcp(void)
 
 
 
-
-
-
-
-/**
- * @brief        
- * 
- * @param
- */
-static void StartTcpTask(void const * argument)
-{
-	/* init code for LWIP */
-	
-	char * buffer = pvPortMalloc(1024);
-	
-	ip_addr_t local_ip;
-	ip_addr_t remote_ip;
-	/* LWIP */ 
-	MX_LWIP_Init();
-	printf("LWIP init complete\r\n");
-	/* wait gnetif ip_addr */
-	while(gnetif.ip_addr.addr == 0)
-  {
-		osDelay(10);
-		printf("LWIP init failed\r\n");
-	}
-	printf("DHCP worked ip: %s\r\n",ip4addr_ntoa(&gnetif.ip_addr));
-	/***************************************************************************************************/
-	/* Set connect to TCP Server */
-	if(config_tcp_mode == TCP_CLIENT) {
-	printf("TCP_MODE_CLIENT\r\n");
-	local_ip = gnetif.ip_addr;
-	ip4addr_aton("192.168.1.101", &remote_ip);
-	
-	nc = netconn_new(NETCONN_TCP);
-	if(nc == NULL)
-	{
-		printf("new error tcp client \r\n");
-		while(1) osDelay(1);
-	}
-	
-	res = netconn_bind(nc, &local_ip, 0);
-	if(res != 0)
-	{
-		printf("bind error: %d\r\n",res);
-		while(1) osDelay(1);
-	}
-	
-	res = netconn_connect(nc, &remote_ip, 502);
-	if(res != 0)
-	{
-		printf("connect error: %d\r\n",res);
-		while(1) osDelay(1);
-	}
-	else
-	{
-		printf("connected\r\n");
-	}
-	
-	osThreadDef(netTask, StartnetTask, osPriorityIdle, 0, 256);
-	netTaskHandle = osThreadCreate(osThread(netTask), NULL );
-}
-	
-	/* End set connect to TCP Server */
-	/***************************************************************************************************/
-	
-	/***************************************************************************************************/
-	/* Set connect to TCP Client */
-	if(config_tcp_mode == TCP_SERVER){
-	printf("TCP_MODE_SERVER\r\n");
-	/* Set a new connect tcp*/
-	nc = netconn_new(NETCONN_TCP);
-	/* Bind a netconn to a specific local IP address and port 502*/
-	res = netconn_bind(nc, IP_ADDR_ANY, 502);
-	if(res != 0)
-	{
-		printf("bind net_conn error\r\n");
-		while(1) osDelay(10);
-	}
-	else
-	{
-		printf("bind net_conn complete\r\n");
-	}
-	/* Set a TCP netconn into listen mode */
-	res = netconn_listen(nc);
-	if(res != 0)
-	{
-		printf("listen error\r\n");
-		while(1) osDelay(10);
-	}
-	else
-	{
-		printf("listen net_conn complete\r\n");
-	}
-	}
-	/* End set connect to TCP Client */
-	/***************************************************************************************************/
-	
-	/* Loop netconn_accept */
-	for(;;)
-  {
-		if( config_tcp_mode ==  TCP_CLIENT){
-		osDelay(1);
-		}
-		
-		if( config_tcp_mode ==  TCP_SERVER){
-		res = netconn_accept(nc,&in_nc);
-		printf("netconn_accept\r\n");
-		if(res != 0)
-		{
-			printf("listen error\r\n");
-//			HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_SET);
-//			HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_RESET);
-		}
-		else
-		{
-			osThreadDef(netTask, StartnetTask, osPriorityIdle, 0, 256);
-			netTaskHandle = osThreadCreate(osThread(netTask), (void*) in_nc);
-//			HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_SET);
-//			HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_RESET);
-			printf("incoming connection\r\n");
-		}
-	 }
-  }
-}
-
-static void StartnetTask(void const * argument)
-{
-	/* USER CODE BEGIN StartNetTask */
-	nc_com = (struct netconn*) argument;
-	struct netbuf *nb;
-	volatile err_t res_;
-
-	
-	uint16_t len;
-	char * buffer = pvPortMalloc(1024);
-	
-	/* Infinite loop */
-  for(;;)
-  {
-		if( config_tcp_mode ==  TCP_SERVER){
-		/* get data eth */
-    netconn_recv(nc_com, &nb);
-		if(res_ != 0)
-		{
-		printf("recv error: %d\r\n",res_);
-		while(1) osDelay(1);
-		}
-		else
-		{
-//			printf("recv successful\r\n");
-//			printf("1 with len  = %d\r\n",len);
-			len = netbuf_len(nb);
-//			if(len == 0)
-//			{
-//				printf("2 with len = %d\r\n",len);
-//			}
-			netbuf_copy(nb, buffer, len);
-			netbuf_delete(nb);
-			/* put data to queue */
-		for(uint8_t count = 0; count < len; count++)
-		{
-			osMessagePut(modbusTcpRxQueueHandle, buffer[count], 1);
-		}
-		count_flag_receive_success_tcp++;
-		}
-	}
-		
-		if( config_tcp_mode ==  TCP_CLIENT){
-		res = netconn_recv(nc, &nb);
-		if(res != 0)
-		{
-			printf("recv error: %d\r\n",res);
-			while(1) osDelay(1);
-		}
-		else
-		{
-			len = netbuf_len(nb);
-			netbuf_copy(nb, buffer, len);
-			netbuf_delete(nb);
-			/* put data to queue */
-			for(uint8_t count = 0; count < len; count++)
-			{
-				osMessagePut(modbusTcpRxQueueHandle, buffer[count], 1);
-			}
-			count_flag_receive_success_tcp++;
-		}
-		}
-		osDelay(1);
-  }
-}
-
 void tcp_sendata(uint8_t *pData, uint16_t length)
 {
 	/*if connection by TCP SERVER */
@@ -599,54 +651,10 @@ void tcp_sendata(uint8_t *pData, uint16_t length)
 	{
 		res = netconn_write(nc,pData,length, NETCONN_COPY);
 	}
-	
+
 	/*if connection by TCP CLIENT */
 	if( config_tcp_mode ==  TCP_SERVER)
 	{
 		res = netconn_write(nc_com,pData,length, NETCONN_COPY);
-	}
-	
-	/* check res */
-	if(res != ERR_OK)
-	{
-		printf("error connetion to client\r\n");
-		count_error++;
-		if(count_error == 254)
-		{
-			count_error = 0;
-			netconn_close(nc);
-			netconn_delete(nc);
-			netconn_close(nc_com);
-			netconn_delete(nc_com);
-			/* Set a new connect tcp*/
-		nc = netconn_new(NETCONN_TCP);
-		/* Bind a netconn to a specific local IP address and port 502*/
-		res = netconn_bind(nc, IP_ADDR_ANY, 502);
-		if(res != 0)
-		{
-			printf("bind net_conn error\r\n");
-			while(1) osDelay(10);
-		}
-		else
-		{
-			printf("bind net_conn complete\r\n");
-		}
-		/* Set a TCP netconn into listen mode */
-		res = netconn_listen(nc);
-		if(res != 0)
-		{
-			printf("listen error\r\n");
-			while(1) osDelay(10);
-		}
-		else
-		{
-			printf("listen net_conn complete\r\n");
-		}
-			printf("netconn_delete to client ********************************\\r\n");
-		}
-	}
-	else
-	{
-		count_error = 0;
 	}
 }

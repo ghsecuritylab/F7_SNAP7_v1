@@ -9,10 +9,10 @@
  */
 /* system include */
 #include "usart.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 /* user include */
 #include "modbus_constant.h"
-//#include "modbus_register.h"
+#include "circular_buffer.h"
 /*********************************************************************************
  * MACRO
  */
@@ -20,6 +20,10 @@
 /*********************************************************************************
  * EXTERN
  */
+ 
+extern circular_buf_t cbuf_tcp;
+
+
 extern uint8_t add_slave;
 extern uint16_t modbus_number_register;
 extern uint16_t modbus_number_coil;
@@ -36,7 +40,7 @@ extern uint8_t flag_request_or_response_func4_tcp;
 extern uint8_t flag_request_or_response_func15_tcp;
 extern uint8_t flag_request_or_response_func16_tcp;
 
-extern  osMessageQId modbusTcpRxQueueHandle;
+//extern  osMessageQId modbusTcpRxQueueHandle;
 extern void tcp_sendata(uint8_t *pData, uint16_t length);
 /*********************************************************************************
  * STATIC VARIABLE
@@ -50,8 +54,8 @@ uint8_t buf_tx_modbus_tcp[MAX_TX_MODBUS];
 /*********************************************************************************
  * STATIC FUNCTION
  */
-static uint8_t read_uint8_queue(void);
-static uint16_t read_uint16_queue(void);
+static uint8_t read_uint8_queue_tcp(void);
+static uint16_t read_uint16_queue_tcp(void);
 /*********************************************************************************
  * GLOBAL FUNCTION
  */
@@ -654,7 +658,7 @@ void modbus_tcp_function16_response(uint16_t transaction, uint8_t add_slave_, ui
  */
 uint16_t mb_tcp_read_transaction_id(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 
 /**
@@ -664,7 +668,7 @@ uint16_t mb_tcp_read_transaction_id(void)
  */
 uint16_t mb_tcp_read_protocol_id(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 
 /**
@@ -674,7 +678,7 @@ uint16_t mb_tcp_read_protocol_id(void)
  */
 uint16_t mb_tcp_read_message_length(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 /**
  * @brief        
@@ -683,7 +687,7 @@ uint16_t mb_tcp_read_message_length(void)
  */
 uint8_t mb_tcp_read_addslave(void)
 {
-	return read_uint8_queue();
+	return read_uint8_queue_tcp();
 }
 /**
  * @brief        
@@ -692,7 +696,7 @@ uint8_t mb_tcp_read_addslave(void)
  */
 uint8_t mb_tcp_read_function(void)
 {
-	return read_uint8_queue();
+	return read_uint8_queue_tcp();
 }
 
 /**
@@ -702,7 +706,7 @@ uint8_t mb_tcp_read_function(void)
  */
 uint16_t mb_tcp_read_add_register_start(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 
 /**
@@ -712,7 +716,7 @@ uint16_t mb_tcp_read_add_register_start(void)
  */
 uint16_t mb_tcp_read_number_register(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 
 /**
@@ -722,7 +726,7 @@ uint16_t mb_tcp_read_number_register(void)
  */
 uint16_t mb_tcp_read_value_register(void)
 {
-	return read_uint16_queue();
+	return read_uint16_queue_tcp();
 }
 
 /**
@@ -732,7 +736,7 @@ uint16_t mb_tcp_read_value_register(void)
  */
 uint8_t mb_tcp_read_byte_coil(void)
 {
-	return read_uint8_queue();
+	return read_uint8_queue_tcp();
 }
 
 /**
@@ -742,36 +746,39 @@ uint8_t mb_tcp_read_byte_coil(void)
  */
 uint8_t mb_tcp_read_number_byte_follow(void)
 {
-	return read_uint8_queue();
+	return read_uint8_queue_tcp();
 }
 
 /*********************************************************************************
  * STATIC FUNCTION
  */
-static uint8_t read_uint8_queue(void)
+static uint8_t read_uint8_queue_tcp(void)
 {
 	/* init variable */
 	uint8_t data_return;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
-	data_return = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
+//	data_return = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_tcp,&data_return);
 	/* return value */
 	return data_return;
 }
 
-static uint16_t read_uint16_queue(void)
+static uint16_t read_uint16_queue_tcp(void)
 {
   /* init variable */
 	uint8_t data_1;
 	uint8_t data_2;
 	uint16_t data_return;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
-	data_1 = (uint8_t) data_modbusRx_Queue.value.v;
-	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
-	data_2 = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
+//	data_1 = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusTcpRxQueueHandle,1);
+//	data_2 = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_tcp,&data_1);
+	circular_buf_get(&cbuf_tcp,&data_2);
 	/* return value */
 	data_return = data_1*256 + data_2;
 	return data_return;

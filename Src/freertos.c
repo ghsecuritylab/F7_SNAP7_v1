@@ -54,11 +54,11 @@
 /* USER CODE BEGIN Includes */     
 #include "adc.h"
 #include "modbus.h"
+
 /* USER CODE END Includes */
 
 /* Variables -----------------------------------------------------------------*/
 osThreadId SysTaskHandle;
-osThreadId ModbusTaskHandle;
 osMessageQId modbusTcpRxQueueHandle;
 osMessageQId modbusRtuQueueHandle;
 osMessageQId modbusAsciiQueueHandle;
@@ -67,11 +67,14 @@ osMessageQId modbusAsciiQueueHandle;
 uint16_t button = 0;
 uint8_t button_action = 0;
 uint16_t adc_buffer[13];
+
+void StartModbusTask(void const * argument);
+osThreadId ModbusTaskHandle;
+
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
 void StartSysTask(void const * argument);
-void StartModbusTask(void const * argument);
 
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -97,6 +100,24 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 /* USER CODE END FunctionPrototypes */
 
 /* Hook prototypes */
+void vApplicationMallocFailedHook(void);
+
+/* USER CODE BEGIN 5 */
+__weak void vApplicationMallocFailedHook(void)
+{
+   /* vApplicationMallocFailedHook() will only be called if
+   configUSE_MALLOC_FAILED_HOOK is set to 1 in FreeRTOSConfig.h. It is a hook
+   function that will get called if a call to pvPortMalloc() fails.
+   pvPortMalloc() is called internally by the kernel whenever a task, queue,
+   timer or semaphore is created. It is also called by various parts of the
+   demo application. If heap_1.c or heap_2.c are used, then the size of the
+   heap available to pvPortMalloc() is defined by configTOTAL_HEAP_SIZE in
+   FreeRTOSConfig.h, and the xPortGetFreeHeapSize() API function can be used
+   to query the size of free heap space that remains (although it does not
+   provide information on how the remaining heap might be fragmented). */
+	printf("vApplicationMallocFailedHook\r\n");
+}
+/* USER CODE END 5 */
 
 /* Init FreeRTOS */
 
@@ -121,10 +142,6 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of SysTask */
   osThreadDef(SysTask, StartSysTask, osPriorityNormal, 0, 128);
   SysTaskHandle = osThreadCreate(osThread(SysTask), NULL);
-
-  /* definition and creation of ModbusTask */
-//  osThreadDef(ModbusTask, StartModbusTask, osPriorityIdle, 0, 128);
-//  ModbusTaskHandle = osThreadCreate(osThread(ModbusTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -158,7 +175,7 @@ void StartSysTask(void const * argument)
 	modbus_register_init(1,100,50);																																				// register init
 //	modbus_ascii_port_init(&huart4,115200,UART_WORDLENGTH_8B,UART_STOPBITS_1,UART_PARITY_NONE);						// modbus ascii init
 //	modbus_rtu_port_init(&huart6,115200,UART_WORDLENGTH_8B,UART_STOPBITS_1,UART_PARITY_NONE);							// modbus rtu init
-	modbus_tcp_port_init(TCP_CLIENT);																																			// modbus tcp init
+	modbus_tcp_port_init(TCP_SERVER);																																			// modbus tcp init
 	printf("modbus init complete\r\n");
 	/* Start thread modbus */
 	osThreadDef(ModbusTask, StartModbusTask, osPriorityIdle, 0, 128);
@@ -171,27 +188,28 @@ void StartSysTask(void const * argument)
 		/* update register analog input */
 		for(uint8_t count = 0; count < 13; count++)
 		{
-			modbus_register_30000[count] = adc_buffer[count];
+			modbus_register_40000[count] = adc_buffer[count];
 		}
 		
-		if(button_action != 0)
-		{
-			modbus_tcp_writemultiple_register(1,0,13,adc_buffer);
-			button_action = 0;
-			osDelay(300);
-			modbus_tcp_check_input();
-		}
+//		if(button_action != 0)
+//		{
+//			modbus_tcp_writemultiple_register(1,0,13,adc_buffer);
+//			button_action = 0;
+//			osDelay(300);
+//			modbus_tcp_check_input();
+//		}
 		
-		modbus_tcp_readholding_register(1,0,13);
-		osDelay(300);
+//		modbus_tcp_readholding_register(1,0,13);
+//		osDelay(300);
+//		modbus_tcp_check_input();
+//		osDelay(1);
 		modbus_tcp_check_input();
-		osDelay(1);
-		
-		HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0);
-    osDelay(1000);
+    osDelay(20);
   }
   /* USER CODE END StartSysTask */
 }
+
+/* USER CODE BEGIN Application */
 
 /* StartModbusTask function */
 void StartModbusTask(void const * argument)
@@ -200,16 +218,12 @@ void StartModbusTask(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-//		modbus_acsii_check_input();
-//		modbus_rtu_check_input();
-//		modbus_tcp_check_input();
-    osDelay(100);
+		HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0);
+    osDelay(500);
   }
   /* USER CODE END StartModbusTask */
 }
 
-/* USER CODE BEGIN Application */
-     
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

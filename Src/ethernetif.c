@@ -107,7 +107,35 @@ osSemaphoreId s_xSemaphore = NULL;
 ETH_HandleTypeDef heth;
 
 /* USER CODE BEGIN 3 */
+//uint8_t ethernetif_set_link(struct netif *netif)
+//{
+//  uint32_t regvalue = 0;
+//	uint8_t status_conn;
 
+//  /* Read PHY_MISR*/
+//  HAL_ETH_ReadPHYRegister(&heth, PHY_ISFR, &regvalue);
+
+//  /* Check whether the link interrupt has occurred or not */
+//  if((regvalue & PHY_ISFR_INT4) != (uint16_t)RESET)
+//  {
+////    netif_set_link_down(netif);
+////		printf("link down user\r\n");
+////		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_SET);
+////	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_RESET);
+//		status_conn = 0;
+//  }
+
+//  HAL_ETH_ReadPHYRegister(&heth, PHY_BSR, &regvalue);
+
+//  if((regvalue & PHY_LINKED_STATUS) != (uint16_t)RESET) {
+////    netif_set_link_up(netif);
+////		printf("link up user\r\n");
+////		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_7,GPIO_PIN_SET);
+////		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_14,GPIO_PIN_RESET);
+//		status_conn = 1;
+//  }
+//	return status_conn;
+//}
 /* USER CODE END 3 */
 
 /* Private functions ---------------------------------------------------------*/
@@ -642,6 +670,40 @@ u32_t sys_now(void)
 }
 
 /* USER CODE END 6 */
+
+/**
+  * @brief  This function sets the netif link status.
+  * @param  netif: the network interface
+  * @retval None
+  */  
+void ethernetif_set_link(void const *argument)
+{
+  uint32_t regvalue = 0;
+  struct link_str *link_arg = (struct link_str *)argument;
+  
+  for(;;)
+  {
+    /* Read PHY_BSR*/
+    HAL_ETH_ReadPHYRegister(&heth, PHY_BSR, &regvalue);
+    
+    regvalue &= PHY_LINKED_STATUS;
+    
+    /* Check whether the netif link down and the PHY link is up */
+    if(!netif_is_link_up(link_arg->netif) && (regvalue))
+    {
+      /* network cable is connected */ 
+      netif_set_link_up(link_arg->netif);        
+    }
+    else if(netif_is_link_up(link_arg->netif) && (!regvalue))
+    {
+      /* network cable is dis-connected */
+      netif_set_link_down(link_arg->netif);
+    }
+    
+    /* Suspend thread for 200 ms */
+    osDelay(200);
+  }
+}
 
 /* USER CODE BEGIN 7 */
 

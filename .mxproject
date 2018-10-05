@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=C:/Users/ngocm/Documents/GitHub/STM32F767/F7_SNAP7_v1/Inc
+HeaderPath=C:/Users/Minhneo/Documents/GitHub/F7_SNAP7_v4/Inc
 HeaderFiles=gpio.h;adc.h;FreeRTOSConfig.h;lwip.h;lwipopts.h;ethernetif.h;usart.h;stm32f7xx_it.h;stm32f7xx_hal_conf.h;main.h;dma.h;
-SourcePath=C:/Users/ngocm/Documents/GitHub/STM32F767/F7_SNAP7_v1/Src
+SourcePath=C:/Users/Minhneo/Documents/GitHub/F7_SNAP7_v4/Src
 SourceFiles=gpio.c;adc.c;freertos.c;lwip.c;ethernetif.c;usart.c;stm32f7xx_it.c;stm32f7xx_hal_msp.c;main.c;dma.c;
 
 [PreviousLibFiles]

@@ -999,12 +999,11 @@ ARM Macro Assembler    Page 16
               00000000 
 Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M7.fp.dp --apcs=
 interwork --depend=f7_snap7\startup_stm32f767xx.d -of7_snap7\startup_stm32f767x
-x.o -I..\Inc -IC:\Users\ngocm\Documents\GitHub\STM32F767\F7_SNAP7_v1\MDK-ARM\RT
-E -IC:\Keil_v5\ARM\PACK\ARM\CMSIS\4.3.0\CMSIS\Include -IC:\Keil_v5\ARM\PACK\Kei
-l\STM32F7xx_DFP\2.9.0\Drivers\CMSIS\Device\ST\STM32F7xx\Include --predefine="__
-MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 515" --predefine="_RTE_ SE
-TA 1" --predefine="STM32F767xx SETA 1" --list=startup_stm32f767xx.lst startup_s
-tm32f767xx.s
+x.o -I..\Inc -I.\RTE\_F7_SNAP7 -IC:\Keil_v5\ARM\PACK\ARM\CMSIS\5.3.0\CMSIS\Incl
+ude -IC:\Keil_v5\ARM\PACK\Keil\STM32F7xx_DFP\2.10.0\Drivers\CMSIS\Device\ST\STM
+32F7xx\Include --predefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION S
+ETA 525" --predefine="_RTE_ SETA 1" --predefine="STM32F767xx SETA 1" --list=sta
+rtup_stm32f767xx.lst startup_stm32f767xx.s
 
 
 
