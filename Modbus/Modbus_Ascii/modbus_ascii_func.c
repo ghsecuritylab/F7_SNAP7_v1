@@ -9,11 +9,13 @@
  */
 /* system include */
 #include "usart.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 /* user include */
 #include "modbus_ascii.h"
 #include "modbus_ascii_func.h"
 #include "modbus_constant.h"
+
+#include "circular_buffer.h"
 /*********************************************************************************
  * MACRO
  */
@@ -42,7 +44,7 @@ extern uint16_t modbus_register_40000[MAX_REGISTES];
  */
 extern UART_HandleTypeDef*  DEBUG;
 extern UART_HandleTypeDef* uart_modbus_ascii;
-extern osMessageQId modbusAsciiQueueHandle;
+extern circular_buf_t cbuf_asc;
 
 extern uint8_t buf_rx_ascii[MAX_BUFFER_RX];
 extern uint8_t flag_request_or_response_func1_ascii;
@@ -913,13 +915,15 @@ static uint8_t mb_ascii_read_2byte(void)
 	/* init variable */
 	uint8_t first_byte;
 	uint8_t second_byte;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	first_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	first_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&first_byte);
 	/* get second byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	second_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	second_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&second_byte);
 	/* return 1 function add slave to 2 byte ascii*/
 	return ascii_to_hex(first_byte, second_byte);
 }
@@ -931,19 +935,23 @@ static uint16_t mb_ascii_read_4byte(void)
 	uint8_t second_byte;
 	uint8_t third_byte;
 	uint8_t fourth_byte;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	first_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	first_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&first_byte);
 	/* get second byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	second_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	second_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&second_byte);
 	/* get third byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	third_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	third_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&third_byte);
 	/* get fourth byte data */
-	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
-	fourth_byte = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusAsciiQueueHandle,1);
+//	fourth_byte = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_asc,&fourth_byte);
 	/* return 1 function add slave to 4 byte ascii*/
 	return (256*ascii_to_hex(first_byte, second_byte) + ascii_to_hex(third_byte, fourth_byte));
 }

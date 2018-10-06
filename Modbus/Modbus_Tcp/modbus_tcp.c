@@ -44,7 +44,7 @@ extern struct netif gnetif;
 extern void StartNetTask(void const * argument);
 
 
-uint8_t buffer_data[100];
+uint8_t buffer_data_TCP[100];
 circular_buf_t cbuf_tcp;
 /*********************************************************************************
  * MACRO
@@ -178,7 +178,7 @@ void ethernetif_notify_conn_changed(struct netif *netif)
  */
 void modbus_tcp_port_init(uint8_t tcp_modde)
 {
-	circular_buf_init(&cbuf_tcp,buffer_data,100);
+	circular_buf_init(&cbuf_tcp,buffer_data_TCP,100);
 	if(tcp_modde == TCP_CLIENT)
 	{
 		printf("SET TCP_MODE_CLIENT\r\n");
@@ -239,7 +239,7 @@ static void StartTcpTask(void const * argument)
 		if(res != 0)
 		{
 			
-			printf("netconn_accept in StartTcpTask error with err_code is %d\r\n",res);                           //////*****************************************///////
+			printf("netconn_accept in StartTcpTask error with err_code is %d\r\n",res);   //////*****************************************///////
 			osThreadTerminate(netTaskHandle);			
 			netconn_close(nc);
 			netconn_delete(nc);

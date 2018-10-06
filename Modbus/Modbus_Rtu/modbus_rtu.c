@@ -9,11 +9,13 @@
  */
 /* system include */
 #include "usart.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 /* user include */
 #include "modbus_rtu.h"
 #include "modbus_rtu_func.h"
 #include "modbus_constant.h"
+
+#include "circular_buffer.h"
 /*********************************************************************************
  * MACRO
  */
@@ -33,7 +35,9 @@ extern uint8_t modbus_register_10000[MAX_REGISTES];
 extern uint16_t modbus_register_30000[MAX_REGISTES];
 extern uint16_t modbus_register_40000[MAX_REGISTES];
 
-extern  osMessageQId modbusRtuQueueHandle;
+uint8_t buffer_data_RTU[100];
+uint8_t clear_data_rtu;
+circular_buf_t cbuf_rtu;
 /*********************************************************************************
  * STATIC VARIABLE
  */
@@ -91,6 +95,9 @@ static void function16_handle_rtu(void);
  */
 void modbus_rtu_port_init(UART_HandleTypeDef *huart, uint32_t BaudRate, uint32_t WordLength, uint32_t StopBits, uint32_t Parity)
 {
+	/* Init circular buffer */
+	circular_buf_init(&cbuf_rtu,buffer_data_RTU,100);
+	
 	/* Init uart */
 	uart_modbus_rtu = huart;
 	uart_modbus_rtu->Init.BaudRate   = BaudRate;
@@ -120,7 +127,7 @@ void modbus_rtu_get_input(UART_HandleTypeDef *huart)
 {
 	if(huart->Instance == uart_modbus_rtu->Instance)
 	{
-		osMessagePut(modbusRtuQueueHandle,modbus_rx_buf_rtu,1);
+		circular_buf_put(&cbuf_rtu,modbus_rx_buf_rtu);
 		HAL_UART_Receive_IT(huart,(uint8_t *)&modbus_rx_buf_rtu,1);
 	}
 }

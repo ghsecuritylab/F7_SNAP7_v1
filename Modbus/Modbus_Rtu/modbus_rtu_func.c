@@ -9,11 +9,13 @@
  */
 /* system include */
 #include "usart.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 /* user include */
 #include "modbus_rtu.h"
 #include "modbus_rtu_func.h"
 #include "modbus_constant.h"
+
+#include "circular_buffer.h"
 /*********************************************************************************
  * MACRO
  */
@@ -39,7 +41,7 @@ extern uint16_t modbus_register_40000[MAX_REGISTES];
 
 extern UART_HandleTypeDef*  DEBUG;
 extern UART_HandleTypeDef* uart_modbus_rtu;
-extern osMessageQId modbusRtuQueueHandle;
+extern circular_buf_t cbuf_rtu;
 
 extern uint8_t buf_rx_rtu[MAX_BUFFER_RX];
 /* flag receive request or response */
@@ -669,10 +671,11 @@ static uint8_t read_uint8_queue(void)
 {
 	/* init variable */
 	uint8_t data_return;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
-	data_return = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
+//	data_return = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_rtu,&data_return);
 	/* return value */
 	return data_return;
 }
@@ -683,12 +686,14 @@ static uint16_t read_uint16_queue(void)
 	uint8_t data_1;
 	uint8_t data_2;
 	uint16_t data_return;
-	osEvent data_modbusRx_Queue;
+//	osEvent data_modbusRx_Queue;
 	/* get first byte data */
-	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
-	data_1 = (uint8_t) data_modbusRx_Queue.value.v;
-	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
-	data_2 = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
+//	data_1 = (uint8_t) data_modbusRx_Queue.value.v;
+//	data_modbusRx_Queue = osMessageGet(modbusRtuQueueHandle,1);
+//	data_2 = (uint8_t) data_modbusRx_Queue.value.v;
+	circular_buf_get(&cbuf_rtu,&data_1);
+	circular_buf_get(&cbuf_rtu,&data_2);
 	/* return value */
 	data_return = data_1*256 + data_2;
 	return data_return;

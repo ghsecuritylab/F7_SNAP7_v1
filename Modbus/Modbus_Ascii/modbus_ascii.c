@@ -9,11 +9,13 @@
  */
 /* system include */
 #include "usart.h"
-#include "cmsis_os.h"
+//#include "cmsis_os.h"
 /* user include */
 #include "modbus_ascii.h"
 #include "modbus_ascii_func.h"
 #include "modbus_constant.h"
+
+#include "circular_buffer.h"
 /*********************************************************************************
  * MACRO
  */
@@ -31,8 +33,10 @@ extern uint8_t modbus_register_00000[MAX_REGISTES];
 extern uint8_t modbus_register_10000[MAX_REGISTES];
 extern uint16_t modbus_register_30000[MAX_REGISTES];
 extern uint16_t modbus_register_40000[MAX_REGISTES];
-extern  osMessageQId modbusAsciiQueueHandle;
 
+uint8_t buffer_data_ASC[100];
+uint8_t clear_data_asc;
+circular_buf_t cbuf_asc;
 /*********************************************************************************
  * STATIC VARIABLE
  */
@@ -92,6 +96,9 @@ static void function16_handle_ascii(void);
  */
 void modbus_ascii_port_init(UART_HandleTypeDef *huart, uint32_t BaudRate, uint32_t WordLength, uint32_t StopBits, uint32_t Parity)
 {
+	/* Init circular buffer */
+	circular_buf_init(&cbuf_asc,buffer_data_ASC,100);
+	
 	/* Init uart */
 	uart_modbus_ascii = huart;
 	uart_modbus_ascii->Init.BaudRate   = BaudRate;
@@ -110,6 +117,8 @@ void modbus_ascii_port_init(UART_HandleTypeDef *huart, uint32_t BaudRate, uint32
 	{
 		HAL_UART_Receive_IT(uart_modbus_ascii,(uint8_t *)&modbus_rx_buf_ascii,1);
 	}
+	
+	
 }
 
 /**
@@ -121,7 +130,7 @@ void modbus_acsii_get_input(UART_HandleTypeDef *huart)
 {
 	if(huart->Instance == uart_modbus_ascii->Instance)
 	{
-		osMessagePut(modbusAsciiQueueHandle,modbus_rx_buf_ascii,1);
+		circular_buf_put(&cbuf_asc,modbus_rx_buf_ascii);
 		HAL_UART_Receive_IT(huart,(uint8_t *)&modbus_rx_buf_ascii,1);
 		if(modbus_rx_buf_ascii == 0x0A) flag_receive_sucess_ascii++;
 	}
@@ -134,14 +143,16 @@ void modbus_acsii_get_input(UART_HandleTypeDef *huart)
  */
 void modbus_acsii_check_input(void)
 {
-	osEvent check_modbusRx_Queue_ascii;
+	uint8_t check_modbusRx_Queue_ascii;
 	count_data_modbusRx_Queue_ascii = 0;
 	if(flag_receive_sucess_ascii != 0)
 	{
 		/* get byte start */
-		check_modbusRx_Queue_ascii = osMessageGet(modbusAsciiQueueHandle,1);
+//		check_modbusRx_Queue_ascii = osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&check_modbusRx_Queue_ascii);
 
-		if(check_modbusRx_Queue_ascii.value.v == 0x3A)
+//		if(check_modbusRx_Queue_ascii.value.v == 0x3A)
+		if(check_modbusRx_Queue_ascii == 0x3A)
 		{
 			/* get byte add slave */
 			byte_get_add_slave_ascii = mb_ascii_read_addslave();
@@ -286,8 +297,11 @@ static void function2_handle_ascii(void)
 		}
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+
 		if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 		{
 			for(uint16_t count = 0; count < number_byte_follow_ascii; count++)
@@ -318,8 +332,10 @@ static void function3_handle_ascii(void)
 		buf_rx_ascii[count_data_modbusRx_Queue_ascii++] = (uint8_t) number_register_ascii % 256;
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 		{
 			modbus_acsii_function3_response(add_register_start_ascii,number_register_ascii);
@@ -344,8 +360,10 @@ static void function3_handle_ascii(void)
 		}
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 		{
 			for(uint16_t count = 0; count < (number_byte_follow_ascii / 2); count++)
@@ -376,8 +394,10 @@ static void function4_handle_ascii(void)
 		buf_rx_ascii[count_data_modbusRx_Queue_ascii++] = (uint8_t) number_register_ascii % 256;
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 		{
 			modbus_ascii_function4_response(add_register_start_ascii,number_register_ascii);
@@ -402,8 +422,10 @@ static void function4_handle_ascii(void)
 		}
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 		{
 			for(uint16_t count = 0; count < (number_byte_follow_ascii / 2); count++)
@@ -456,8 +478,10 @@ static void function15_handle_ascii(void)
 			}
 			lrc = mb_ascii_read_lrc();
 			/* clear 2 byte end frame modbus */
-			osMessageGet(modbusAsciiQueueHandle,1);
-			osMessageGet(modbusAsciiQueueHandle,1);
+			circular_buf_get(&cbuf_asc,&clear_data_asc);
+			circular_buf_get(&cbuf_asc,&clear_data_asc);
+//			osMessageGet(modbusAsciiQueueHandle,1);
+//			osMessageGet(modbusAsciiQueueHandle,1);
 			if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 			{
 				/*send Response */
@@ -486,8 +510,10 @@ static void function15_handle_ascii(void)
 		number_register_ascii = mb_ascii_read_number_register();
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		
 		flag_request_or_response_func15_ascii = RECEIVE_REQUEST;
 	}
@@ -523,8 +549,10 @@ static void function16_handle_ascii(void)
 			}
 			lrc = mb_ascii_read_lrc();
 			/* clear 2 byte end frame modbus */
-			osMessageGet(modbusAsciiQueueHandle,1);
-			osMessageGet(modbusAsciiQueueHandle,1);
+			circular_buf_get(&cbuf_asc,&clear_data_asc);
+			circular_buf_get(&cbuf_asc,&clear_data_asc);
+//			osMessageGet(modbusAsciiQueueHandle,1);
+//			osMessageGet(modbusAsciiQueueHandle,1);
 			if(calulator_lrc_input_ascii(count_data_modbusRx_Queue_ascii) == lrc)
 			{
 				/*send Response */
@@ -553,8 +581,10 @@ static void function16_handle_ascii(void)
 		number_register_ascii = mb_ascii_read_number_register();
 		lrc = mb_ascii_read_lrc();
 		/* clear 2 byte end frame modbus */
-		osMessageGet(modbusAsciiQueueHandle,1);
-		osMessageGet(modbusAsciiQueueHandle,1);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+		circular_buf_get(&cbuf_asc,&clear_data_asc);
+//		osMessageGet(modbusAsciiQueueHandle,1);
+//		osMessageGet(modbusAsciiQueueHandle,1);
 		
 		flag_request_or_response_func16_ascii = RECEIVE_REQUEST;
 	}
@@ -563,12 +593,12 @@ static void function16_handle_ascii(void)
 static void clear_modbus_frame(void)
 {
 	/* Init get data queue */
-	osEvent clear_queue;
+//	osEvent clear_queue;
 	/* clear frame */
 	do
 	{
-	  clear_queue = osMessageGet(modbusAsciiQueueHandle,1);
-	}while(clear_queue.value.v != 0x0A);
+	  circular_buf_get(&cbuf_asc,&clear_data_asc);
+	}while(clear_data_asc != 0x0A);
 }
 
 static uint8_t calulator_lrc_input_ascii(uint16_t length)
